@@ -1,0 +1,612 @@
+
+// State aplikasi
+let currentStep = 1;
+let selectedMovieId = null;
+let selectedDate = null;
+let selectedStudioId = null;
+let selectedTime = null;
+let selectedSeats = [];
+let currentScheduleId = null;
+const servicesFee = 5000;
+const ticketPrice = 50000;
+
+// Fungsi step navigation
+function goToStep(step) {
+    // Validasi sebelum pindah step
+    if (step > currentStep) {
+        if (step === 2 && !selectedMovieId) {
+            alert('Silakan pilih film terlebih dahulu');
+            return;
+        }
+        if (step === 3 && (!selectedDate || !selectedStudioId || !selectedTime)) {
+            alert('Silakan pilih tanggal, studio, dan jam tayang');
+            return;
+        }
+        if (step === 4 && selectedSeats.length === 0) {
+            alert('Silakan pilih kursi terlebih dahulu');
+            return;
+        }
+    }
+    
+    // Sembunyikan step sebelumnya dan tampilkan step baru
+    document.getElementById(`step${currentStep}-content`).classList.remove('active');
+    document.getElementById(`step${currentStep}-indicator`).classList.remove('active');
+
+    document.getElementById(`step${step}-content`).classList.add('active');
+    document.getElementById(`step${step}-indicator`).classList.add('active');
+
+    currentStep = step;
+
+    // Jika ke step seat selection, muat data kursi
+    if (step === 3) {
+        loadSeatMap();
+        updateBookingSummary();
+    }
+
+    // Jika ke step pembayaran, update summary final
+    if (step === 4) {
+        updateFinalSummary();
+    }
+
+    // Scroll ke atas
+    window.scrollTo(0, 0);
+}
+
+function prevStep() {
+    if (currentStep > 1) {
+        goToStep(currentStep - 1);
+    }
+}
+
+// Step 1: Pilih Film
+function selectMovie(movieId) {
+    selectedMovieId = movieId;
+
+    // Update UI
+    document.querySelectorAll('.movie-card').forEach(card => {
+        card.classList.remove('border', 'border-primary');
+    });
+
+    document.querySelector(`.movie-card[data-movie-id="${movieId}"]`).classList.add('border', 'border-primary');
+
+    // Update movie info di step 2
+    document.getElementById('selected-movie-poster').src = movies[movieId].poster_url;
+    document.getElementById('selected-movie-title').textContent = movies[movieId].judul;
+    document.getElementById('selected-movie-duration').textContent = movies[movieId].durasi;
+
+    // Persiapkan kalender
+    generateDateSelector();
+    
+    // Langsung ke step 2
+    goToStep(2);
+}
+
+// Step 2: Generate Date Selector
+function generateDateSelector() {
+    const dateSelector = document.getElementById('date-selector');
+    dateSelector.innerHTML = '';
+    
+    const today = new Date();
+    
+    // Generate 7 hari ke depan
+    for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(today.getDate() + i);
+        
+        const dateString = formatDate(date);
+        const dayName = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][date.getDay()];
+        const formattedDate = `${date.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][date.getMonth()]}`;
+        
+        const dateCard = document.createElement('div');
+        dateCard.className = 'card text-center me-2';
+        dateCard.style.minWidth = '100px';
+        dateCard.style.cursor = 'pointer';
+        dateCard.dataset.date = dateString;
+        dateCard.innerHTML = `
+            <div class="card-body p-2">
+                <div class="fw-bold">${dayName}</div>
+                <div>${formattedDate}</div>
+            </div>
+        `;
+        
+        dateCard.addEventListener('click', () => selectDate(dateString, dateCard));
+        dateSelector.appendChild(dateCard);
+    }
+    
+    // Pilih tanggal hari ini secara default
+    const todayCard = dateSelector.querySelector(`[data-date="${formatDate(today)}"]`);
+    if (todayCard) {
+        todayCard.click();
+    }
+}
+
+function formatDate(date) {
+    const d = new Date(date);
+    const month = `${d.getMonth() + 1}`.padStart(2, '0');
+    const day = `${d.getDate()}`.padStart(2, '0');
+    const year = d.getFullYear();
+    return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDate(dateString) {
+    const date = new Date(dateString);
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('id-ID', options);
+}
+
+// Step 2: Pilih Tanggal
+function selectDate(dateString, dateElement) {
+    selectedDate = dateString;
+    
+    // Update UI
+    document.querySelectorAll('#date-selector .card').forEach(card => {
+        card.classList.remove('bg-primary', 'text-white');
+    });
+    
+    // Highlight the selected date
+    dateElement.classList.add('bg-primary', 'text-white');
+    
+    // Reset studio and time selection
+    selectedStudioId = null;
+    selectedTime = null;
+    document.getElementById('next-to-seats').disabled = true;
+    
+    // Load schedules for the selected date
+    loadSchedule();
+}
+
+// Step 2: Load Schedule (Integrated Mock)
+async function loadSchedule() {
+    const scheduleContainer = document.getElementById('schedule-container');
+    scheduleContainer.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+    
+    try {
+        // Gunakan mock data yang terintegrasi dengan database
+        const response = await fetch(`mock_schedules.php?movie_id=${selectedMovieId}&date=${selectedDate}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            renderSchedule(data.schedules);
+        } else {
+            throw new Error(data.message || 'Gagal memuat jadwal');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        
+        // Fallback ke mock data statis jika error
+        const mockData = {
+            success: true,
+            schedules: [
+                {
+                    id: 'schedule1',
+                    studio_id: 'studio1',
+                    studio_nama: 'Studio 1',
+                    studio_kapasitas: 100,
+                    time: '10:00',
+                    available_seats: 85
+                },
+                {
+                    id: 'schedule2',
+                    studio_id: 'studio2',
+                    studio_nama: 'Studio 2',
+                    studio_kapasitas: 80,
+                    time: '13:00',
+                    available_seats: 75
+                }
+            ]
+        };
+        
+        renderSchedule(mockData.schedules);
+    }
+}
+
+function renderSchedule(schedules) {
+    const scheduleContainer = document.getElementById('schedule-container');
+    scheduleContainer.innerHTML = '';
+    
+    if (schedules.length === 0) {
+        scheduleContainer.innerHTML = '<div class="alert alert-warning">Tidak ada jadwal tersedia untuk tanggal ini</div>';
+        return;
+    }
+    
+    // Group schedules by studio
+    const studios = {};
+    schedules.forEach(schedule => {
+        if (!studios[schedule.studio_id]) {
+            studios[schedule.studio_id] = {
+                nama: schedule.studio_nama,
+                kapasitas: schedule.studio_kapasitas,
+                times: []
+            };
+        }
+        studios[schedule.studio_id].times.push({
+            id: schedule.id,
+            time: schedule.time,
+            available_seats: schedule.available_seats
+        });
+    });
+    
+    // Render studio options
+    for (const studioId in studios) {
+        const studio = studios[studioId];
+        const studioCard = document.createElement('div');
+        studioCard.className = 'card mb-3';
+        studioCard.innerHTML = `
+            <div class="card-header">
+                <h6 class="mb-0">${studio.nama} (Kapasitas: ${studio.kapasitas})</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2" id="times-${studioId}"></div>
+            </div>
+        `;
+        scheduleContainer.appendChild(studioCard);
+        
+        // Render time options for each studio
+        const timesContainer = document.getElementById(`times-${studioId}`);
+        studio.times.forEach(time => {
+            const timeBtn = document.createElement('button');
+            timeBtn.className = 'btn btn-outline-primary screening-time';
+            timeBtn.textContent = time.time;
+            timeBtn.title = `${time.available_seats} kursi tersedia`;
+            timeBtn.dataset.studioId = studioId;
+            timeBtn.dataset.time = time.time;
+            timeBtn.dataset.scheduleId = time.id;
+            
+            timeBtn.addEventListener('click', (e) => {
+                selectedStudioId = studioId;
+                selectedTime = time.time;
+                currentScheduleId = time.id;
+                
+                // Update UI
+                document.querySelectorAll('.screening-time').forEach(btn => {
+                    btn.classList.remove('selected');
+                });
+                e.target.classList.add('selected');
+                document.getElementById('next-to-seats').disabled = false;
+                
+                // Update summary
+                updateBookingSummary();
+            });
+            
+            timesContainer.appendChild(timeBtn);
+        });
+    }
+}
+
+function selectSchedule(scheduleId, studioId, time, element) {
+    console.log("Selected schedule ID:", scheduleId); // Tambahkan log
+    selectedStudioId = studioId;
+    selectedTime = time;
+    currentScheduleId = scheduleId;
+    
+    // Update UI
+    document.querySelectorAll('.screening-time').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+    element.classList.add('selected');
+    document.getElementById('next-to-seats').disabled = false;
+    
+    // Update summary
+    updateBookingSummary();
+}
+
+// Step 3: Load Seat Map
+async function loadSeatMap() {
+    const seatMap = document.getElementById('seat-map');
+    seatMap.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2">Memuat denah kursi...</p></div>';
+    
+    console.log("Loading seats for schedule ID:", currentScheduleId); // Tambahkan log
+    
+    try {
+        const response = await fetch(`get_seats.php?schedule_id=${currentScheduleId}`);
+        const data = await response.json();
+        
+        console.log("Seat data response:", data); // Tambahkan log
+        
+        if (data.success) {
+            renderSeatMap(data.seats, data.occupied_seats);
+        } else {
+            throw new Error(data.message || 'Gagal memuat denah kursi');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        seatMap.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+    }
+}
+// Step 3: Load Seat Map
+async function loadSeatMap() {
+    const seatMap = document.getElementById('seat-map');
+    seatMap.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2">Memuat denah kursi...</p></div>';
+    
+    try {
+        const response = await fetch(`get_seats.php?schedule_id=${currentScheduleId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            renderSeatMap(data.seats, data.occupied_seats);
+        } else {
+            throw new Error(data.message || 'Gagal memuat denah kursi');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        
+        // Fallback ke mock data statis jika error
+        const mockSeats = generateMockSeats();
+        const mockOccupiedSeats = ['A2', 'B5', 'C3', 'D7', 'E1'];
+        renderSeatMap(mockSeats, mockOccupiedSeats);
+    }
+}
+
+// Variables for dragging functionality
+let isDragging = false;
+let dragStartSeat = null;
+let currentOccupiedSeats = [];
+
+function renderSeatMap(seats, occupiedSeats) {
+    const seatMap = document.getElementById('seat-map');
+    seatMap.innerHTML = '';
+    
+    currentOccupiedSeats = [...occupiedSeats];
+    const capacity = seats.length;
+    const layout = calculateSplitLayout(capacity);
+
+    // Create screen
+    const screen = document.createElement('div');
+    screen.className = 'screen mb-4';
+    screen.textContent = 'Layar';
+    seatMap.appendChild(screen);
+
+    // Create container for seat sections
+    const container = document.createElement('div');
+    container.className = 'd-flex justify-content-center gap-5';
+    seatMap.appendChild(container);
+
+    // Create left section
+    const leftSection = document.createElement('div');
+    leftSection.className = 'seat-section';
+    container.appendChild(leftSection);
+
+    // Create right section if needed
+    let rightSection = null;
+    if (layout.shouldSplit) {
+        rightSection = document.createElement('div');
+        rightSection.className = 'seat-section';
+        container.appendChild(rightSection);
+    }
+
+    // Render seats
+    for (let row = 0; row < layout.totalRows; row++) {
+        const rowLetter = String.fromCharCode(65 + row);
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'seat-row d-flex align-items-center mb-2';
+
+        // Add row label
+        const rowLabel = document.createElement('div');
+        rowLabel.className = 'row-label me-2';
+        rowLabel.textContent = rowLetter;
+        rowDiv.appendChild(rowLabel);
+
+        // Create seats wrapper
+        const seatsWrapper = document.createElement('div');
+        seatsWrapper.className = 'seats-wrapper d-flex gap-2';
+
+        // Determine which section this row belongs to
+        const currentSection = (row < layout.leftRows) ? leftSection : rightSection;
+
+        // Add seats
+        for (let col = 1; col <= layout.seatsPerRow; col++) {
+            const seatNumber = `${rowLetter}${col}`;
+            const seatIndex = (row * layout.seatsPerRow) + col;
+            
+            if (seatIndex <= capacity) {
+                const seat = createSeat(seatNumber);
+                seatsWrapper.appendChild(seat);
+            }
+        }
+
+        rowDiv.appendChild(seatsWrapper);
+        currentSection.appendChild(rowDiv);
+    }
+
+    // Add exit label if split
+    if (layout.shouldSplit) {
+        const exitLabel = document.createElement('div');
+        exitLabel.className = 'text-center mt-3';
+        exitLabel.innerHTML = '<span class="badge bg-secondary">Pintu Keluar</span>';
+        seatMap.appendChild(exitLabel);
+    }
+}
+
+// Fungsi pembuat kursi
+function createSeat(seatNumber) {
+    const seat = document.createElement('div');
+    seat.className = 'seat';
+    seat.dataset.seat = seatNumber;
+    seat.textContent = seatNumber.match(/\d+/)[0];
+    
+    if (currentOccupiedSeats.includes(seatNumber)) {
+        seat.classList.add('occupied');
+    } else {
+        seat.classList.add('available');
+        seat.addEventListener('click', () => toggleSeatSelection(seat));
+    }
+    
+    return seat;
+}
+function toggleSeatSelection(seatElement) {
+    const seatNumber = seatElement.dataset.seat;
+    
+    if (seatElement.classList.contains('selected')) {
+        // Deselect seat
+        seatElement.classList.remove('selected');
+        seatElement.classList.add('available');
+        selectedSeats = selectedSeats.filter(s => s !== seatNumber);
+    } else {
+        // Select seat
+        seatElement.classList.remove('available');
+        seatElement.classList.add('selected');
+        selectedSeats.push(seatNumber);
+    }
+    
+    updateSelectedSeatsDisplay();
+    document.getElementById('next-to-payment').disabled = selectedSeats.length === 0;
+}
+function handleSeatMouseDown(e) {
+    // Only process if seat is available (not occupied)
+    if (e.target.classList.contains('occupied')) return;
+    
+    isDragging = true;
+    dragStartSeat = e.target.dataset.seat;
+    toggleSeatSelection(e.target);
+    e.preventDefault();
+}
+
+function handleSeatMouseEnter(e) {
+    // Only process if dragging and seat is available
+    if (isDragging && e.target.classList.contains('available')) {
+        e.target.classList.add('dragging-over');
+        toggleSeatSelection(e.target);
+    }
+}
+
+function handleSeatMouseUp() {
+    isDragging = false;
+    document.querySelectorAll('.seat.dragging-over').forEach(seat => {
+        seat.classList.remove('dragging-over');
+    });
+}
+
+// Add function to calculate split layout
+function calculateSplitLayout(capacity) {
+    const seatsPerRow = 10;
+    const totalRows = Math.ceil(capacity / seatsPerRow);
+    const shouldSplit = totalRows > 5;
+    const leftRows = shouldSplit ? Math.ceil(totalRows / 2) : totalRows;
+    
+    return {
+        seatsPerRow,
+        totalRows,
+        shouldSplit,
+        leftRows
+    };
+}
+
+// Update the toggle seat selection function to work with the existing system
+function calculateSplitLayout(capacity) {
+    const seatsPerRow = 10;
+    const totalRows = Math.ceil(capacity / seatsPerRow);
+    const shouldSplit = capacity >= 80;
+    const leftRows = shouldSplit ? Math.floor(totalRows / 2) : totalRows;
+    
+    return {
+        seatsPerRow,
+        totalRows,
+        shouldSplit,
+        leftRows
+    };
+}
+function updateSelectedSeatsDisplay() {
+    const selectedSeatsElement = document.getElementById('selected-seats');
+    const ticketCountElement = document.getElementById('ticket-count');
+    const totalPriceElement = document.getElementById('total-price');
+    
+    if (selectedSeats.length > 0) {
+        selectedSeatsElement.textContent = selectedSeats.join(', ');
+        ticketCountElement.textContent = selectedSeats.length;
+        totalPriceElement.textContent = `Rp ${(selectedSeats.length * ticketPrice).toLocaleString('id-ID')}`;
+    } else {
+        selectedSeatsElement.textContent = '-';
+        ticketCountElement.textContent = '0';
+        totalPriceElement.textContent = 'Rp 0';
+    }
+}
+// Step 3: Update Booking Summary
+function updateBookingSummary() {
+    if (!selectedMovieId || !selectedDate || !selectedStudioId || !selectedTime) return;
+    
+    document.getElementById('summary-movie').textContent = movies[selectedMovieId].judul;
+    document.getElementById('summary-date').textContent = formatDisplayDate(selectedDate);
+    document.getElementById('summary-studio').textContent = document.querySelector(`.screening-time.selected`).parentElement.parentElement.querySelector('.card-header h6').textContent;
+    document.getElementById('summary-time').textContent = selectedTime;
+}
+
+// Step 4: Update Final Summary
+function updateFinalSummary() {
+    document.getElementById('final-movie').textContent = movies[selectedMovieId].judul;
+    document.getElementById('final-date').textContent = formatDisplayDate(selectedDate);
+    document.getElementById('final-studio').textContent = document.querySelector(`.screening-time.selected`).parentElement.parentElement.querySelector('.card-header h6').textContent;
+    document.getElementById('final-time').textContent = selectedTime;
+    document.getElementById('final-seats').textContent = selectedSeats.join(', ');
+    document.getElementById('final-ticket-count').textContent = selectedSeats.length;
+    
+    const subtotal = selectedSeats.length * ticketPrice;
+    const total = subtotal + servicesFee;
+    
+    document.getElementById('final-subtotal').textContent = `Rp ${subtotal.toLocaleString('id-ID')}`;
+    document.getElementById('final-total-price').textContent = `Rp ${total.toLocaleString('id-ID')}`;
+}
+
+// Step 4: Submit Booking
+async function submitBooking() {
+    const loadingSpinner = document.getElementById('loading-spinner');
+    loadingSpinner.classList.remove('d-none');
+    
+    try {
+        const paymentMethod = document.querySelector('input[name="payment_method"]:checked').value;
+        const name = document.getElementById('name').value;
+        const email = document.getElementById('email').value;
+        const phone = document.getElementById('phone').value;
+        
+        const response = await fetch('process_booking.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                schedule_id: currentScheduleId,
+                seats: selectedSeats,
+                payment_method: paymentMethod,
+                customer_name: name,
+                customer_email: email,
+                customer_phone: phone,
+                total_price: (selectedSeats.length * ticketPrice) + servicesFee
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Redirect to booking confirmation page
+            window.location.href = `booking_confirmation.php?booking_id=${data.booking_id}`;
+        } else {
+            throw new Error(data.message || 'Gagal memproses pemesanan');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert(`Gagal memproses pemesanan: ${error.message}`);
+    } finally {
+        loadingSpinner.classList.add('d-none');
+    }
+}
+
+// Initialize date picker if we're on step 2 and movie is selected
+if (currentStep === 2 && selectedMovieId) {
+    generateDateSelector();
+    document.addEventListener('DOMContentLoaded', function() {
+    // Event listener untuk movie cards
+    document.querySelectorAll('.movie-card').forEach(card => {
+        card.addEventListener('click', function() {
+            selectMovie(this.dataset.movieId);
+        });
+    });
+    
+    // Event listener untuk tombol next/back
+    document.getElementById('next-to-seats').addEventListener('click', () => goToStep(3));
+    document.getElementById('next-to-payment').addEventListener('click', () => goToStep(4));
+    
+    // Jika sudah di step 2 dan ada movie yang dipilih
+    if (currentStep === 2 && selectedMovieId) {
+        generateDateSelector();
+    }
+});
+}

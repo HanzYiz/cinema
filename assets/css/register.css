@@ -1,0 +1,79 @@
+
+/* Gunakan style yang sama dengan login */
+body.register-page {
+  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), 
+              url('../assets/images/cinema-bg.jpg');
+  background-size: cover;
+  background-position: center;
+  font-family: 'Arial', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+}
+
+.register-container {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  padding: 30px;
+  width: 100%;
+  max-width: 450px;
+  margin: 20px;
+}
+
+.register-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.register-header i {
+  font-size: 50px;
+  color: #3498db;
+  margin-bottom: 10px;
+}
+
+.register-header h2 {
+  color: #333;
+  font-weight: bold;
+}
+
+.form-control {
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  box-shadow: none;
+  height: 42px;
+}
+
+.form-control:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.btn-register {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 4px;
+  transition: background 0.3s;
+  margin-top: 10px;
+}
+
+.btn-register:hover {
+  background: #2980b9;
+}
+
+.register-link {
+  color: #3498db;
+  font-weight: bold;
+}
+
+/* Toggle Password */
+.input-group-addon.password-toggle {
+  cursor: pointer;
+  background: transparent;
+  border-left: none;
+}

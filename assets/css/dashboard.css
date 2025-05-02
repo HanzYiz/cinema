@@ -1,0 +1,41 @@
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+  }
+  body {
+    background-color: #f8f9fa;
+  }
+  .profile-card {
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .profile-pic {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border: 3px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .booking-card {
+    transition: transform 0.2s;
+    border-radius: 10px;
+  }
+  .booking-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+  }
+  .movie-poster {
+    height: 120px;
+    object-fit: cover;
+    border-radius: 5px;
+  }
+  .badge-pending {
+    background-color: #ffc107;
+    color: #000;
+  }
+  .badge-paid {
+    background-color: #198754;
+  }
+  .stat-card {
+    border-left: 4px solid var(--primary-color);
+  }

@@ -1,0 +1,24 @@
+.hero-section {
+  background: url('https://via.placeholder.com/1920x600') no-repeat center center;
+  background-size: cover;
+  height: 60vh;
+  position: relative;
+}
+.hero-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+.text-shadow {
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+.movie-card {
+  margin-bottom: 20px;
+  height: 100%;
+}
+.movie-card img {
+  height: 450px;
+  object-fit: cover;
+}
